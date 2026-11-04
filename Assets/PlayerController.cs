@@ -15,6 +15,7 @@
         private float attackTimeRemaining = 0f;
         public CharacterController controller;
         public float moveSpeed = 3f;
+        public Transform boss;
         void Start()
         {
             
@@ -22,7 +23,14 @@
 
         // Update is called once per frame
         void Update()
-        {
+        {   
+            //This pretty much allows the player to constantly be facing the boss while keeping y zero so they dont tilt and stuff, we then use that calculated direction and make quaternion use said direction to rotate the player around it.
+            Vector3 bossDirection = boss.position - transform.position;
+            bossDirection.y = 0f;
+            if (bossDirection != Vector3.zero)
+            {
+            transform.rotation = Quaternion.LookRotation(bossDirection);
+            }
             //This is how attack is going to work, added a timer because this would then allow the attack to fully go uninterrupted for that specific amount of time before accpeting other actions with return at the end there, basically exiting the frame and each other frame until that timer hits 0.
             if (currentState == PlayerState.Attack){
                 attackTimeRemaining = attackTimeRemaining - Time.deltaTime;
