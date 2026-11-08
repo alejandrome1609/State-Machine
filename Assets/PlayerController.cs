@@ -1,92 +1,317 @@
-    using UnityEngine;
-    using UnityEngine.InputSystem;
+using UnityEngine;
+using UnityEngine.InputSystem;
 
-    public class PlayerController : MonoBehaviour
+public class PlayerController : MonoBehaviour
+{
+    public Animator animator;
+    public CharacterController controller;
+    public Transform boss;
+
+    public float moveSpeed = 3f;
+    public float attackDuration = 1f;
+    private float attackTimeRemaining = 0f;
+    public float raiseDuration = 1.23f;
+    private float raiseTimeRemaining = 0f;
+    private float chargeTime = 0f;
+    public float heavyAttackDuration = 3.6f;
+    private float heavyAttackTimeRemaining = 0f;
+    private bool chargeReleased = false;
+    public int health = 100;
+    public float parryDuration = 0.25f;
+    private float parryTimeRemaining = 0f;
+    public BossController bossController;
+    public float attackHitDelay = 0.7f;
+    private float attackHitTimeRemaining = 0f;
+    private bool attackHitChecked = false;
+
+    public int attackDamage = 10;
+    public float attackRange = 6.5f;
+    public int heavyBaseDamage = 20;
+    public float maxChargeTime = 2f;
+    public float heavyHitDelay = 0.3f;
+
+    private float heavyHitTimeRemaining = 0f;
+    private bool heavyHitChecked = false;
+    private int chargedDamage = 0;
+
+    private enum PlayerState
     {
-        // Start is called once before the first execution of Update after the MonoBehaviour is created
-        public Animator animator;
-        //Since I think I undertstood what enums do last class, I actually went and tried them and for some reason, they just felt better to use than just regular if statements, especially with what im going for here.
-        //Made different states a character can have, the starting one being idle.
-        private enum PlayerState{
-            Idle, Move, Block, Attack
-        }
-        private PlayerState currentState = PlayerState.Idle;
-        public float attackDuration = 1f;
-        private float attackTimeRemaining = 0f;
-        public CharacterController controller;
-        public float moveSpeed = 3f;
-        public Transform boss;
-        void Start()
+        Idle,
+        Move,
+        Block,
+        Attack,
+        Charge,
+        HeavyAttack
+    }
+
+    private PlayerState currentState = PlayerState.Idle;
+    public void TakeDamage(int damage)
+    {
+        if (currentState == PlayerState.Block)
         {
-            
+            if (parryTimeRemaining > 0f)
+            {
+                Debug.Log("Parried!");
+                parryTimeRemaining = 0f;
+                bossController.GetParried();
+            }
+            else
+            {
+                Debug.Log("Blocked!");
+            }
+
+            return;
         }
 
-        // Update is called once per frame
-        void Update()
-        {   
-            //This pretty much allows the player to constantly be facing the boss while keeping y zero so they dont tilt and stuff, we then use that calculated direction and make quaternion use said direction to rotate the player around it.
-            Vector3 bossDirection = boss.position - transform.position;
-            bossDirection.y = 0f;
-            if (bossDirection != Vector3.zero)
+        health = health - damage;
+        Debug.Log("Player health: " + health);
+    }
+
+    //all state changes go through this function, makes code clean.
+    private void SetState(PlayerState newState)
+    {
+        //in english this pretty much says: "if we're already in this state, don't restart its animation or timer." it will then allow animations to flow smoothly and not get interrupted.
+        if (currentState == newState)
+        {
+            return;
+        }
+
+        currentState = newState;
+        animator.speed = 1f;
+
+        if (currentState == PlayerState.Idle)
+        {
+            animator.Play("Idle");
+        }
+        else if (currentState == PlayerState.Move)
+        {
+            animator.Play("Move");
+        }
+        else if (currentState == PlayerState.Block)
+        {
+            parryTimeRemaining = parryDuration;
+            animator.Play("Block");
+        }
+        else if (currentState == PlayerState.Attack)
+        {
+            attackTimeRemaining = attackDuration;
+
+            attackHitTimeRemaining = attackHitDelay;
+            attackHitChecked = false;
+
+            animator.Play("Attack", 0, 0f);
+        }
+        else if (currentState == PlayerState.Charge)
+        {
+            raiseTimeRemaining = raiseDuration / 2f;
+            chargeTime = 0f;
+            chargeReleased = false;
+
+            animator.speed = 2f;
+            animator.Play("HeavyAttack", 0, 0f);
+        }
+        else if (currentState == PlayerState.HeavyAttack)
+        {
+            heavyAttackTimeRemaining = heavyAttackDuration;
+            heavyHitTimeRemaining = heavyHitDelay;
+            heavyHitChecked = false;
+
+            // Only count up to two seconds of charging by default.
+            float countedCharge = chargeTime;
+
+            if (countedCharge > maxChargeTime)
             {
-            transform.rotation = Quaternion.LookRotation(bossDirection);
-            }
-            //This is how attack is going to work, added a timer because this would then allow the attack to fully go uninterrupted for that specific amount of time before accpeting other actions with return at the end there, basically exiting the frame and each other frame until that timer hits 0.
-            if (currentState == PlayerState.Attack){
-                attackTimeRemaining = attackTimeRemaining - Time.deltaTime;
-
-                if (attackTimeRemaining <= 0){
-                    currentState = PlayerState.Idle;
-                    animator.Play("Idle");
-                }
-
-                return;
-            }
-            //Blocking sequence, pretty self explanatory, had to group the states together to then get this in english: "Right click must be held and we must be either idle or moving"
-            if (Mouse.current.rightButton.isPressed && (currentState == PlayerState.Idle || currentState == PlayerState.Move)){
-                currentState = PlayerState.Block;
-                animator.Play("Block");
-            }
-            //This returns the character back to idle after they are done holding block 
-            else if (Mouse.current.rightButton.isPressed == false && currentState == PlayerState.Block){
-                currentState = PlayerState.Idle;
-                animator.Play("Idle");
-            }
-            //Attacking sequence, kinda the same thing here as block, but this now checks wether it was pressed each frame since attacks will only happen once in the future game im going for.
-            //We set the timer again so every new attack get its full duration.
-            if (Mouse.current.leftButton.wasPressedThisFrame && (currentState == PlayerState.Idle || currentState == PlayerState.Move)){
-                currentState = PlayerState.Attack;
-                attackTimeRemaining = attackDuration;
-                animator.Play("Attack");
+                countedCharge = maxChargeTime;
             }
 
-            //Movement code, since my game is just simply moving left or right, it'll just have to be based on directions.
-            //Pretty self explanatory, this chunk of code will only work if the player is not attacking or blocking.
-            if (currentState == PlayerState.Idle || currentState == PlayerState.Move){
-                float direction = 0f;
+            chargedDamage = heavyBaseDamage + Mathf.RoundToInt(countedCharge * 10f);
 
-                if (Keyboard.current.aKey.isPressed){
-                    direction = direction - 1f;
-                }
-
-                if (Keyboard.current.dKey.isPressed){
-                    direction = direction + 1f;
-                }
-
-                if (direction != 0f){
-                    if (currentState != PlayerState.Move){
-                        currentState = PlayerState.Move;
-                        animator.Play("Move");
-                    }
-
-                    controller.Move(transform.right * direction * moveSpeed * Time.deltaTime);
-                    
-                }
-
-                else if (currentState == PlayerState.Move){
-                    currentState = PlayerState.Idle;
-                    animator.Play("Idle");
-                }
-            }
+            // Continue the downward swing at normal speed.
+            animator.speed = 1f;
         }
     }
+
+    // Start is called once before the first execution of Update after the MonoBehaviour is created
+    void Start()
+    {
+
+    }
+
+    // Update is called once per frame
+    void Update()
+    {
+        //this allows the player to constantly face the boss while keeping y at zero so theres no tilting and funny buisiness.
+        Vector3 bossDirection = boss.position - transform.position;
+        bossDirection.y = 0f;
+
+        if (bossDirection != Vector3.zero)
+        {
+            transform.rotation = Quaternion.LookRotation(bossDirection);
+        }
+        if (parryTimeRemaining > 0f)
+        {
+            parryTimeRemaining = parryTimeRemaining - Time.deltaTime;
+        }
+        //this reads each movement fresh each frame.
+        float sideways = 0f;
+        float forwards = 0f;
+
+        if (Keyboard.current.aKey.isPressed)
+        {
+            sideways = sideways - 1f;
+        }
+
+        if (Keyboard.current.dKey.isPressed)
+        {
+            sideways = sideways + 1f;
+        }
+
+        if (Keyboard.current.wKey.isPressed)
+        {
+            forwards = forwards + 1f;
+        }
+
+        if (Keyboard.current.sKey.isPressed)
+        {
+            forwards = forwards - 1f;
+        }
+
+        Vector3 movement = transform.right * sideways + transform.forward * forwards;
+
+        //here I actually decided to limit  the vector's length to 1. why? because in playtesting I found out moving diagonally actually was faster, so this pretty much prevents it.
+        movement = Vector3.ClampMagnitude(movement, 1f);
+
+        //this counts down an attack thats happening, will help us know when attack ends.
+        if (currentState == PlayerState.Attack)
+        {
+            attackTimeRemaining = attackTimeRemaining - Time.deltaTime;
+
+            if (attackHitChecked == false)
+            {
+                attackHitTimeRemaining =
+                    attackHitTimeRemaining - Time.deltaTime;
+
+                if (attackHitTimeRemaining <= 0f)
+                {
+                    attackHitChecked = true;
+
+                    float distance = Vector3.Distance(
+                        transform.position, boss.position
+                    );
+
+                    if (distance <= attackRange)
+                    {
+                        bossController.TakeDamage(attackDamage);
+                    }
+                    else
+                    {
+                        Debug.Log("Attack missed!");
+                    }
+                }
+            }
+        }
+
+        //this decides what state we want, without changing currentState yet.
+        PlayerState nextState = PlayerState.Idle;
+
+        if (movement != Vector3.zero)
+        {
+            nextState = PlayerState.Move;
+        }
+
+        //here, we NEEDED to add that an unfinished attack should take priority over blocking or another attack.
+        if (currentState == PlayerState.Charge)
+        {
+            nextState = PlayerState.Charge;
+
+            //this remembers if space was released, even during the raising motion.
+            if (Keyboard.current.spaceKey.isPressed == false)
+            {
+                chargeReleased = true;
+            }
+
+            if (chargeReleased == false)
+            {
+                chargeTime = chargeTime + Time.deltaTime;
+            }
+
+            if (raiseTimeRemaining > 0f)
+            {
+                raiseTimeRemaining = raiseTimeRemaining - Time.deltaTime;
+            }
+
+            //once the sword is raised, either hold the pose or begin the swing.
+            if (raiseTimeRemaining <= 0f)
+            {
+                if (chargeReleased == true)
+                {
+                    nextState = PlayerState.HeavyAttack;
+                }
+                else
+                {
+                    animator.speed = 0f;
+                }
+            }
+        }
+        else if (currentState == PlayerState.HeavyAttack)
+        {
+            heavyAttackTimeRemaining =
+                heavyAttackTimeRemaining - Time.deltaTime;
+
+            if (heavyHitChecked == false)
+            {
+                heavyHitTimeRemaining =
+                    heavyHitTimeRemaining - Time.deltaTime;
+
+                if (heavyHitTimeRemaining <= 0f)
+                {
+                    heavyHitChecked = true;
+
+                    float distance = Vector3.Distance(
+                        transform.position, boss.position
+                    );
+
+                    if (distance <= attackRange)
+                    {
+                        bossController.TakeDamage(chargedDamage);
+                        Debug.Log("Heavy damage: " + chargedDamage);
+                    }
+                    else
+                    {
+                        Debug.Log("Heavy attack missed!");
+                    }
+                }
+            }
+
+            if (heavyAttackTimeRemaining > 0f)
+            {
+                nextState = PlayerState.HeavyAttack;
+            }
+        }
+        else if (currentState == PlayerState.Attack && attackTimeRemaining > 0f)
+        {
+            nextState = PlayerState.Attack;
+        }
+        else if (Mouse.current.rightButton.isPressed)
+        {
+            nextState = PlayerState.Block;
+        }
+        else if (Keyboard.current.spaceKey.wasPressedThisFrame)
+        {
+            nextState = PlayerState.Charge;
+        }
+        else if (Mouse.current.leftButton.wasPressedThisFrame)
+        {
+            nextState = PlayerState.Attack;
+        }
+
+        //applies our final choice once per update.
+        SetState(nextState);
+
+        //this was added after feedback, basic attacks should allow movement, but blocking does not.
+        if (currentState == PlayerState.Idle ||currentState == PlayerState.Move ||currentState == PlayerState.Attack)
+        {
+            controller.Move(movement * moveSpeed * Time.deltaTime);
+        }
+    }
+}
