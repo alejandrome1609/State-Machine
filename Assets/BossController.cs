@@ -11,7 +11,8 @@ public class BossController : MonoBehaviour
         Windup,
         Attack,
         Recover,
-        Stunned
+        Stunned,
+        Dead
     }
     public float windupDuration = 1f;
     public float attackDuration = 0.2f;
@@ -22,9 +23,22 @@ public class BossController : MonoBehaviour
     public float attackRange = 6.5f;
     public float stunDuration = 2f;
     public int health = 300;
+    public GameManager gameManager;
     public void TakeDamage(int damage)
     {
+        if (currentState == BossState.Dead)
+        {
+            return;
+        }
+
         health = health - damage;
+
+        if (health <= 0)
+        {
+            health = 0;
+            SetState(BossState.Dead);
+        }
+
         Debug.Log("Boss health: " + health);
     }
 
@@ -57,9 +71,7 @@ public class BossController : MonoBehaviour
             stateTimeRemaining = attackDuration;
             bossRenderer.material.color = Color.red;
 
-            float distance = Vector3.Distance(
-                transform.position, player.position
-            );
+            float distance = Vector3.Distance(transform.position, player.position);
 
             if (distance <= attackRange)
             {
@@ -82,9 +94,21 @@ public class BossController : MonoBehaviour
             stateTimeRemaining = stunDuration;
             bossRenderer.material.color = Color.magenta;
         }
+        else if (currentState == BossState.Dead)
+        {
+            agent.isStopped = true;
+            bossRenderer.material.color = Color.gray;
+            Debug.Log("Boss defeated!");
+            gameManager.EndGame(true);
+        }
     }
     public void GetParried()
     {
+        if (currentState == BossState.Dead)
+        {
+            return;
+        }
+
         SetState(BossState.Stunned);
     }
     // Start is called once before the first execution of Update after the MonoBehaviour is created
@@ -96,15 +120,18 @@ public class BossController : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        if (currentState == BossState.Dead)
+        {
+            return;
+        }
+
         BossState nextState = currentState;
 
         if (currentState == BossState.Chase)
         {
             agent.SetDestination(player.position);
 
-            float distance = Vector3.Distance(
-                transform.position, player.position
-            );
+            float distance = Vector3.Distance(transform.position, player.position);
 
             if (distance <= agent.stoppingDistance + 0.5f)
             {
@@ -113,7 +140,6 @@ public class BossController : MonoBehaviour
         }
         else
         {
-            // Windup, Attack, and Recover each use this countdown.
             stateTimeRemaining = stateTimeRemaining - Time.deltaTime;
 
             if (stateTimeRemaining <= 0f)

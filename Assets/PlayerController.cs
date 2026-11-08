@@ -33,6 +33,11 @@ public class PlayerController : MonoBehaviour
     private float heavyHitTimeRemaining = 0f;
     private bool heavyHitChecked = false;
     private int chargedDamage = 0;
+    public GameManager gameManager;
+    public float blockCooldown = 0.4f;
+    private float blockCooldownRemaining = 0f;
+    public ParticleSystem fullChargeEffect;
+    private bool fullChargeShown = false;
 
     private enum PlayerState
     {
@@ -41,12 +46,17 @@ public class PlayerController : MonoBehaviour
         Block,
         Attack,
         Charge,
-        HeavyAttack
+        HeavyAttack,
+        Dead
     }
 
     private PlayerState currentState = PlayerState.Idle;
     public void TakeDamage(int damage)
     {
+        if (currentState == PlayerState.Dead)
+        {
+            return;
+        }
         if (currentState == PlayerState.Block)
         {
             if (parryTimeRemaining > 0f)
@@ -64,6 +74,13 @@ public class PlayerController : MonoBehaviour
         }
 
         health = health - damage;
+
+        if (health <= 0)
+        {
+            health = 0;
+            SetState(PlayerState.Dead);
+        }
+
         Debug.Log("Player health: " + health);
     }
 
@@ -75,7 +92,11 @@ public class PlayerController : MonoBehaviour
         {
             return;
         }
-
+        // Leaving Block starts a cooldown.
+        if (currentState == PlayerState.Block)
+        {
+            blockCooldownRemaining = blockCooldown;
+        }
         currentState = newState;
         animator.speed = 1f;
 
@@ -94,17 +115,19 @@ public class PlayerController : MonoBehaviour
         }
         else if (currentState == PlayerState.Attack)
         {
-            attackTimeRemaining = attackDuration;
-
-            attackHitTimeRemaining = attackHitDelay;
+            attackTimeRemaining = attackDuration / 0.8f;
+            attackHitTimeRemaining = attackHitDelay / 0.8f;
             attackHitChecked = false;
 
-            animator.Play("Attack", 0, 0f);
+            animator.speed = 0.8f;
+            animator.Play("Attack", 0, 0f); 
         }
         else if (currentState == PlayerState.Charge)
         {
             raiseTimeRemaining = raiseDuration / 2f;
             chargeTime = 0f;
+            fullChargeShown = false;
+            fullChargeEffect.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
             chargeReleased = false;
 
             animator.speed = 2f;
@@ -112,11 +135,12 @@ public class PlayerController : MonoBehaviour
         }
         else if (currentState == PlayerState.HeavyAttack)
         {
-            heavyAttackTimeRemaining = heavyAttackDuration;
-            heavyHitTimeRemaining = heavyHitDelay;
+            heavyAttackTimeRemaining = heavyAttackDuration / 1.5f;
+            heavyHitTimeRemaining = heavyHitDelay / 1.5f;
             heavyHitChecked = false;
+            fullChargeEffect.Stop(true,ParticleSystemStopBehavior.StopEmittingAndClear);
 
-            // Only count up to two seconds of charging by default.
+            
             float countedCharge = chargeTime;
 
             if (countedCharge > maxChargeTime)
@@ -124,10 +148,16 @@ public class PlayerController : MonoBehaviour
                 countedCharge = maxChargeTime;
             }
 
-            chargedDamage = heavyBaseDamage + Mathf.RoundToInt(countedCharge * 10f);
+            chargedDamage = heavyBaseDamage + Mathf.RoundToInt((countedCharge/ maxChargeTime) * 30f);
 
-            // Continue the downward swing at normal speed.
-            animator.speed = 1f;
+           
+            animator.speed = 1.5f;
+        }
+        else if (currentState == PlayerState.Dead)
+        {
+            animator.Play("Idle");
+            Debug.Log("Player defeated!");
+            gameManager.EndGame(false);
         }
     }
 
@@ -140,6 +170,14 @@ public class PlayerController : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        if (currentState == PlayerState.Dead)
+        {
+            return;
+        }
+        if (blockCooldownRemaining > 0f)
+        {
+            blockCooldownRemaining = blockCooldownRemaining - Time.deltaTime;
+        }
         //this allows the player to constantly face the boss while keeping y at zero so theres no tilting and funny buisiness.
         Vector3 bossDirection = boss.position - transform.position;
         bossDirection.y = 0f;
@@ -195,9 +233,7 @@ public class PlayerController : MonoBehaviour
                 {
                     attackHitChecked = true;
 
-                    float distance = Vector3.Distance(
-                        transform.position, boss.position
-                    );
+                    float distance = Vector3.Distance(transform.position, boss.position);
 
                     if (distance <= attackRange)
                     {
@@ -233,6 +269,12 @@ public class PlayerController : MonoBehaviour
             if (chargeReleased == false)
             {
                 chargeTime = chargeTime + Time.deltaTime;
+
+                if (chargeTime >= maxChargeTime && fullChargeShown == false)
+                {
+                    fullChargeShown = true;
+                    fullChargeEffect.Play();
+                }
             }
 
             if (raiseTimeRemaining > 0f)
@@ -255,21 +297,17 @@ public class PlayerController : MonoBehaviour
         }
         else if (currentState == PlayerState.HeavyAttack)
         {
-            heavyAttackTimeRemaining =
-                heavyAttackTimeRemaining - Time.deltaTime;
+            heavyAttackTimeRemaining = heavyAttackTimeRemaining - Time.deltaTime;
 
             if (heavyHitChecked == false)
             {
-                heavyHitTimeRemaining =
-                    heavyHitTimeRemaining - Time.deltaTime;
+                heavyHitTimeRemaining = heavyHitTimeRemaining - Time.deltaTime;
 
                 if (heavyHitTimeRemaining <= 0f)
                 {
                     heavyHitChecked = true;
 
-                    float distance = Vector3.Distance(
-                        transform.position, boss.position
-                    );
+                    float distance = Vector3.Distance(transform.position, boss.position);
 
                     if (distance <= attackRange)
                     {
@@ -292,7 +330,7 @@ public class PlayerController : MonoBehaviour
         {
             nextState = PlayerState.Attack;
         }
-        else if (Mouse.current.rightButton.isPressed)
+        else if (Mouse.current.rightButton.isPressed && blockCooldownRemaining <= 0f)
         {
             nextState = PlayerState.Block;
         }
