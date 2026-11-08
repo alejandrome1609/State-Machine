@@ -38,8 +38,6 @@ public class BossController : MonoBehaviour
             health = 0;
             SetState(BossState.Dead);
         }
-
-        Debug.Log("Boss health: " + health);
     }
 
 
@@ -77,10 +75,6 @@ public class BossController : MonoBehaviour
             {
                 playerController.TakeDamage(attackDamage);
             }
-            else
-            {
-                Debug.Log("Boss missed!");
-            }
         }
         else if (currentState == BossState.Recover)
         {
@@ -98,7 +92,6 @@ public class BossController : MonoBehaviour
         {
             agent.isStopped = true;
             bossRenderer.material.color = Color.gray;
-            Debug.Log("Boss defeated!");
             gameManager.EndGame(true);
         }
     }

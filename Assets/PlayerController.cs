@@ -61,15 +61,9 @@ public class PlayerController : MonoBehaviour
         {
             if (parryTimeRemaining > 0f)
             {
-                Debug.Log("Parried!");
                 parryTimeRemaining = 0f;
                 bossController.GetParried();
             }
-            else
-            {
-                Debug.Log("Blocked!");
-            }
-
             return;
         }
 
@@ -80,8 +74,6 @@ public class PlayerController : MonoBehaviour
             health = 0;
             SetState(PlayerState.Dead);
         }
-
-        Debug.Log("Player health: " + health);
     }
 
     //all state changes go through this function, makes code clean.
@@ -156,7 +148,6 @@ public class PlayerController : MonoBehaviour
         else if (currentState == PlayerState.Dead)
         {
             animator.Play("Idle");
-            Debug.Log("Player defeated!");
             gameManager.EndGame(false);
         }
     }
@@ -226,8 +217,7 @@ public class PlayerController : MonoBehaviour
 
             if (attackHitChecked == false)
             {
-                attackHitTimeRemaining =
-                    attackHitTimeRemaining - Time.deltaTime;
+                attackHitTimeRemaining = attackHitTimeRemaining - Time.deltaTime;
 
                 if (attackHitTimeRemaining <= 0f)
                 {
@@ -238,10 +228,6 @@ public class PlayerController : MonoBehaviour
                     if (distance <= attackRange)
                     {
                         bossController.TakeDamage(attackDamage);
-                    }
-                    else
-                    {
-                        Debug.Log("Attack missed!");
                     }
                 }
             }
@@ -312,11 +298,6 @@ public class PlayerController : MonoBehaviour
                     if (distance <= attackRange)
                     {
                         bossController.TakeDamage(chargedDamage);
-                        Debug.Log("Heavy damage: " + chargedDamage);
-                    }
-                    else
-                    {
-                        Debug.Log("Heavy attack missed!");
                     }
                 }
             }

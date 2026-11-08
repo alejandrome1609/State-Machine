@@ -12,6 +12,7 @@ public class GameManager : MonoBehaviour
 
     private bool gameEnded = false;
 
+    // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
         resultPanel.SetActive(false);
@@ -35,11 +36,10 @@ public class GameManager : MonoBehaviour
             resultText.text = "You Lose!";
         }
 
-        // Stop both scripts from running Update.
         playerController.enabled = false;
         bossController.enabled = false;
 
-        // Disabling the boss script alone doesn't stop its NavMeshAgent.
+        //apparently disabling the boss script alone doesn't stop its NavMeshAgent.
         bossController.agent.isStopped = true;
 
         resultPanel.SetActive(true);
