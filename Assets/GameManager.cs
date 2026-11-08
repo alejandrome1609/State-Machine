@@ -6,9 +6,10 @@ public class GameManager : MonoBehaviour
 {
     public GameObject resultPanel;
     public TMP_Text resultText;
-
     public PlayerController playerController;
     public BossController bossController;
+    public GameObject playerHealthBar;
+    public GameObject bossHealthBar;
 
     private bool gameEnded = false;
 
@@ -29,11 +30,11 @@ public class GameManager : MonoBehaviour
 
         if (playerWon == true)
         {
-            resultText.text = "You Win!";
+            resultText.text = "Nice :D";
         }
         else
         {
-            resultText.text = "You Lose!";
+            resultText.text = "Womp";
         }
 
         playerController.enabled = false;
@@ -41,7 +42,8 @@ public class GameManager : MonoBehaviour
 
         //apparently disabling the boss script alone doesn't stop its NavMeshAgent.
         bossController.agent.isStopped = true;
-
+        playerHealthBar.SetActive(false);
+        bossHealthBar.SetActive(false);
         resultPanel.SetActive(true);
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;

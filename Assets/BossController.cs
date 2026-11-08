@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.AI;
+using UnityEngine.UI;
 
 public class BossController : MonoBehaviour
 {
@@ -24,6 +25,7 @@ public class BossController : MonoBehaviour
     public float stunDuration = 2f;
     public int health = 300;
     public GameManager gameManager;
+    public Slider healthBar;
     public void TakeDamage(int damage)
     {
         if (currentState == BossState.Dead)
@@ -38,6 +40,7 @@ public class BossController : MonoBehaviour
             health = 0;
             SetState(BossState.Dead);
         }
+        healthBar.value = health;
     }
 
 
@@ -107,7 +110,8 @@ public class BossController : MonoBehaviour
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
-        
+        healthBar.maxValue = health;
+        healthBar.value = health;
     }
 
     // Update is called once per frame

@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.UI;
 
 public class PlayerController : MonoBehaviour
 {
@@ -38,6 +39,7 @@ public class PlayerController : MonoBehaviour
     private float blockCooldownRemaining = 0f;
     public ParticleSystem fullChargeEffect;
     private bool fullChargeShown = false;
+    public Slider healthBar;
 
     private enum PlayerState
     {
@@ -57,14 +59,17 @@ public class PlayerController : MonoBehaviour
         {
             return;
         }
+
         if (currentState == PlayerState.Block)
         {
             if (parryTimeRemaining > 0f)
             {
                 parryTimeRemaining = 0f;
                 bossController.GetParried();
+                return;
             }
-            return;
+
+            damage = 10;
         }
 
         health = health - damage;
@@ -74,6 +79,8 @@ public class PlayerController : MonoBehaviour
             health = 0;
             SetState(PlayerState.Dead);
         }
+        healthBar.value = health;
+        Debug.Log("Player health: " + health);
     }
 
     //all state changes go through this function, makes code clean.
@@ -155,7 +162,8 @@ public class PlayerController : MonoBehaviour
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
-
+        healthBar.maxValue = health;
+        healthBar.value = health;
     }
 
     // Update is called once per frame
