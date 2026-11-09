@@ -4,8 +4,10 @@ using UnityEngine.UI;
 
 public class BossController : MonoBehaviour
 {
+    //recieved feedback that the boss should actually follow the player, so, these references here are the navmesh agent that moves our boss and the player it follows.
     public NavMeshAgent agent;
     public Transform player;
+    //same idea as the player, these are the different states the boss can be in.
     private enum BossState
     {
         Chase,
@@ -28,6 +30,7 @@ public class BossController : MonoBehaviour
     public Slider healthBar;
     public Animator weaponAnimator;
     public float sideSwingWindupDuration = 1f;
+    //the player calls this when landing an attack, passing in how much damage it does.
     public void TakeDamage(int damage)
     {
         if (currentState == BossState.Dead)
@@ -37,6 +40,7 @@ public class BossController : MonoBehaviour
 
         health = health - damage;
 
+        //keeps health from showing negative numbers and enters the dead state.
         if (health <= 0)
         {
             health = 0;
@@ -44,8 +48,9 @@ public class BossController : MonoBehaviour
         }
         healthBar.value = health;
     }
-
+    //boss starts by chasing the player.
     private BossState currentState = BossState.Chase;
+    //just like the player script, state changes go through this function.
     private void SetState(BossState newState)
     {
         if (currentState == newState)
@@ -61,18 +66,21 @@ public class BossController : MonoBehaviour
         }
         else if (currentState == BossState.Windup)
         {
+            //boss stops walking while preparing an attack. also restores animation speed in case a parry froze it earlier.
             agent.isStopped = true;
             weaponAnimator.speed = 1f;
-
+            //this picks either 0 or 1, since the upper number isnt included for integers. we only pick when entering windup
             int attackChoice = Random.Range(0, 2);
 
             if (attackChoice == 0)
             {
+                //overhead takes longer to reach the hit, so it gets its own timer.
                 stateTimeRemaining = windupDuration;
                 weaponAnimator.Play("BossOverhead", 0, 0f);
             }
             else
             {
+                //same thing, but with the side swing and its shorter windup.
                 stateTimeRemaining = sideSwingWindupDuration;
                 weaponAnimator.Play("BossSideSwing", 0, 0f);
             }
@@ -81,7 +89,7 @@ public class BossController : MonoBehaviour
         {
             agent.isStopped = true;
             stateTimeRemaining = attackDuration;
-
+            //checks if the player is close enough at the moment the attack lands.
             float distance = Vector3.Distance(transform.position, player.position);
 
             if (distance <= attackRange)
@@ -96,6 +104,7 @@ public class BossController : MonoBehaviour
         }
         else if (currentState == BossState.Stunned)
         {
+            //a successful parry stops both movement and the weapon animation.
             agent.isStopped = true;
             stateTimeRemaining = stunDuration;
             weaponAnimator.speed = 0f;
@@ -107,6 +116,7 @@ public class BossController : MonoBehaviour
             weaponAnimator.speed = 0f;
         }
     }
+    //the player calls this after a successful parry.
     public void GetParried()
     {
         if (currentState == BossState.Dead)
@@ -126,19 +136,21 @@ public class BossController : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        //dead bosses shouldnt be chasing or attacking anyone lol.
         if (currentState == BossState.Dead)
         {
             return;
         }
-
+        //start by assuming we stay in our current state, then check if we need to change.
         BossState nextState = currentState;
 
         if (currentState == BossState.Chase)
         {
+            //updates the destination so the boss follows the player as they move.
             agent.SetDestination(player.position);
 
             float distance = Vector3.Distance(transform.position, player.position);
-
+            //the extra 0.5 gives a little room around the stopping distance so the boss can begin attacking without needing to get perfectly close.
             if (distance <= agent.stoppingDistance + 0.5f)
             {
                 nextState = BossState.Windup;
@@ -146,6 +158,7 @@ public class BossController : MonoBehaviour
         }
         else
         {
+            //the other living states use a countdown to decide when they finish
             stateTimeRemaining = stateTimeRemaining - Time.deltaTime;
 
             if (stateTimeRemaining <= 0f)
@@ -168,7 +181,7 @@ public class BossController : MonoBehaviour
                 }
             }
         }
-
+        //applies whatever state we decided on after checking everything above.
         SetState(nextState);
     }
 }

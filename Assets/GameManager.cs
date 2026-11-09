@@ -40,7 +40,7 @@ public class GameManager : MonoBehaviour
         playerController.enabled = false;
         bossController.enabled = false;
 
-        //apparently disabling the boss script alone doesn't stop its NavMeshAgent.
+        //apparently disabling the boss script alone doesn't stop its NavMeshAgent, added it cuz why not.
         bossController.agent.isStopped = true;
         playerHealthBar.SetActive(false);
         bossHealthBar.SetActive(false);

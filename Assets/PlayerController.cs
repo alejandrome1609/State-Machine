@@ -1,3 +1,4 @@
+using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
@@ -7,7 +8,6 @@ public class PlayerController : MonoBehaviour
     public Animator animator;
     public CharacterController controller;
     public Transform boss;
-
     public float moveSpeed = 3f;
     public float attackDuration = 1f;
     private float attackTimeRemaining = 0f;
@@ -18,33 +18,46 @@ public class PlayerController : MonoBehaviour
     private float heavyAttackTimeRemaining = 0f;
     private bool chargeReleased = false;
     public int health = 100;
-    public float parryDuration = 0.25f;
+    public float parryDuration = 0.08f;
     private float parryTimeRemaining = 0f;
     public BossController bossController;
+    //damage should happen when the sword swings, not immediately when we click.
     public float attackHitDelay = 0.7f;
     private float attackHitTimeRemaining = 0f;
     private bool attackHitChecked = false;
-
     public int attackDamage = 10;
     public float attackRange = 6.5f;
     public int heavyBaseDamage = 20;
-    public float maxChargeTime = 2f;
+    public float maxChargeTime = 1.8f;
+    //same hit timing idea, but for the heavy attack.
     public float heavyHitDelay = 0.3f;
-
     private float heavyHitTimeRemaining = 0f;
     private bool heavyHitChecked = false;
     private int chargedDamage = 0;
     public GameManager gameManager;
+    //leaving block starts a cooldown so we cant constantly spam new parry windows.
     public float blockCooldown = 0.4f;
     private float blockCooldownRemaining = 0f;
     public ParticleSystem fullChargeEffect;
     private bool fullChargeShown = false;
     public Slider healthBar;
     public Image parryFlash;
+    //decided to make normal block protection take a little time to activate, so what when missing the parry window, a player can still take full damage.
     private float parryFlashAlpha = 0f;
-    public float blockProtectionDelay = 0.5f;
+    public float blockProtectionDelay = 0.2f;
     private float blockTimeHeld = 0f;
 
+    //this is to check if the boss is close enough, grabs distance between boss and player, and if its greater than the attack range, then nothing happens and vice versa.
+    private void HitBoss(int damage)
+    {
+        float distance = Vector3.Distance(transform.position, boss.position);
+
+        if (distance <= attackRange)
+        {
+            bossController.TakeDamage(damage);
+        }
+    }
+    //different states our player can be in.
     private enum PlayerState
     {
         Idle,
@@ -57,6 +70,7 @@ public class PlayerController : MonoBehaviour
     }
 
     private PlayerState currentState = PlayerState.Idle;
+    //the boss calls this when its attack reaches the player, which we then decide if that hit gets parried, blocked, or takes full health.
     public void TakeDamage(int damage)
     {
         if (currentState == PlayerState.Dead)
@@ -76,7 +90,7 @@ public class PlayerController : MonoBehaviour
                 bossController.GetParried();
                 return;
             }
-
+            //holding block long enough reduces the damage to 10.
             if (blockTimeHeld >= blockProtectionDelay)
             {
                 damage = 10;
@@ -93,20 +107,20 @@ public class PlayerController : MonoBehaviour
         healthBar.value = health;
     }
 
-    //all state changes go through this function, makes code clean.
+    //all state changes go through this function, makes code clean. its also where we start animations and reset the timers each state needs.
     private void SetState(PlayerState newState)
     {
-        //in english this pretty much says: "if we're already in this state, don't restart its animation or timer." it will then allow animations to flow smoothly and not get interrupted.
         if (currentState == newState)
         {
             return;
         }
-        //this allows eaving block to start a cooldown.
+        //this allows leaving block to start a cooldown. rest is pretty self explanatory, just lots of math i had trouble balancing.
         if (currentState == PlayerState.Block)
         {
             blockCooldownRemaining = blockCooldown;
         }
         currentState = newState;
+        //returns animation speed to normal before applying any special speed i used below.
         animator.speed = 1f;
 
         if (currentState == PlayerState.Idle)
@@ -119,12 +133,14 @@ public class PlayerController : MonoBehaviour
         }
         else if (currentState == PlayerState.Block)
         {
+            //starts counting how long we hold block and opens a fresh parry window
             blockTimeHeld = 0f;
             parryTimeRemaining = parryDuration;
             animator.Play("Block");
         }
         else if (currentState == PlayerState.Attack)
         {
+            //the animation plays slower, so dividing by 0.8 makes its timers longer too. added this after balancing since swinging was pretty op, same thing with heavy below
             attackTimeRemaining = attackDuration / 0.8f;
             attackHitTimeRemaining = attackHitDelay / 0.8f;
             attackHitChecked = false;
@@ -150,7 +166,7 @@ public class PlayerController : MonoBehaviour
             heavyHitChecked = false;
             fullChargeEffect.Stop(true,ParticleSystemStopBehavior.StopEmittingAndClear);
 
-            
+            //holding longer than max charge time shouldnt keep adding damage, then you can one tap the thing.
             float countedCharge = chargeTime;
 
             if (countedCharge > maxChargeTime)
@@ -158,13 +174,17 @@ public class PlayerController : MonoBehaviour
                 countedCharge = maxChargeTime;
             }
 
-            chargedDamage = heavyBaseDamage + Mathf.RoundToInt((countedCharge/ maxChargeTime) * 30f);
+            //charge amount goes from 0 to 1, one being when its fully charged and 0 when its empty.
+            float chargeAmount = countedCharge / maxChargeTime;
 
-           
+            //then a full charge adds 30 damage to our base damage of 20.
+            int bonusDamage = Mathf.RoundToInt(chargeAmount * 30f);
+            chargedDamage = heavyBaseDamage + bonusDamage;
             animator.speed = 1.5f;
         }
         else if (currentState == PlayerState.Dead)
         {
+            //used idle as our placeholder since i couldnt find a death animation anywhere, and I sure as hell wasnt making one, maybe in the future.
             animator.Play("Idle");
             gameManager.EndGame(false);
         }
@@ -180,6 +200,7 @@ public class PlayerController : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        //fades the parry flash back to invisible after it appears.
         if (parryFlashAlpha > 0f)
         {
             parryFlashAlpha = parryFlashAlpha - Time.deltaTime * 3f;
@@ -191,10 +212,11 @@ public class PlayerController : MonoBehaviour
 
             parryFlash.color = new Color(1f, 1f, 1f, parryFlashAlpha);
         }
+        //dead
         if (currentState == PlayerState.Dead)
         {
             return;
-        }
+        }//only counts held time while we're actually in the block state.
         if (currentState == PlayerState.Block)
         {
             blockTimeHeld = blockTimeHeld + Time.deltaTime;
@@ -203,7 +225,7 @@ public class PlayerController : MonoBehaviour
         {
             blockCooldownRemaining = blockCooldownRemaining - Time.deltaTime;
         }
-        //this allows the player to constantly face the boss while keeping y at zero so theres no tilting and funny buisiness.
+        //this pretty much finds the direction towards the boss and ignores the height difference so theres no tilting and funny buisiness going on when fighting.
         Vector3 bossDirection = boss.position - transform.position;
         bossDirection.y = 0f;
 
@@ -241,7 +263,7 @@ public class PlayerController : MonoBehaviour
 
         Vector3 movement = transform.right * sideways + transform.forward * forwards;
 
-        //here I actually decided to limit  the vector's length to 1. why? because in playtesting I found out moving diagonally actually was faster, so this pretty much prevents it.
+        //here I actually decided to limit the vector's length to 1. why? because in playtesting I found out moving diagonally actually was faster, so this pretty much prevents it.
         movement = Vector3.ClampMagnitude(movement, 1f);
 
         //this counts down an attack thats happening, will help us know when attack ends.
@@ -256,18 +278,12 @@ public class PlayerController : MonoBehaviour
                 if (attackHitTimeRemaining <= 0f)
                 {
                     attackHitChecked = true;
-
-                    float distance = Vector3.Distance(transform.position, boss.position);
-
-                    if (distance <= attackRange)
-                    {
-                        bossController.TakeDamage(attackDamage);
-                    }
+                    HitBoss(attackDamage);
                 }
             }
         }
 
-        //this decides what state we want, without changing currentState yet.
+        //idle is our starting choice for this frame unless something below changes it.
         PlayerState nextState = PlayerState.Idle;
 
         if (movement != Vector3.zero)
@@ -275,12 +291,10 @@ public class PlayerController : MonoBehaviour
             nextState = PlayerState.Move;
         }
 
-        //here, we NEEDED to add that an unfinished attack should take priority over blocking or another attack.
+        //here, we NEEDED to add that the player must finish a charge or attack before taking another action.
         if (currentState == PlayerState.Charge)
         {
             nextState = PlayerState.Charge;
-
-            //this remembers if space was released, even during the raising motion.
             if (Keyboard.current.spaceKey.isPressed == false)
             {
                 chargeReleased = true;
@@ -318,7 +332,7 @@ public class PlayerController : MonoBehaviour
         else if (currentState == PlayerState.HeavyAttack)
         {
             heavyAttackTimeRemaining = heavyAttackTimeRemaining - Time.deltaTime;
-
+            //same idea as the basic attack, but this hit uses our calculated charge damage.
             if (heavyHitChecked == false)
             {
                 heavyHitTimeRemaining = heavyHitTimeRemaining - Time.deltaTime;
@@ -326,13 +340,7 @@ public class PlayerController : MonoBehaviour
                 if (heavyHitTimeRemaining <= 0f)
                 {
                     heavyHitChecked = true;
-
-                    float distance = Vector3.Distance(transform.position, boss.position);
-
-                    if (distance <= attackRange)
-                    {
-                        bossController.TakeDamage(chargedDamage);
-                    }
+                    HitBoss(chargedDamage);
                 }
             }
 
