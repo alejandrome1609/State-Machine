@@ -103,6 +103,8 @@ public class PlayerController : MonoBehaviour
         {
             health = 0;
             SetState(PlayerState.Dead);
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
         }
         healthBar.value = health;
     }
