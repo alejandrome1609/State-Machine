@@ -103,8 +103,6 @@ public class PlayerController : MonoBehaviour
         {
             health = 0;
             SetState(PlayerState.Dead);
-            Cursor.lockState = CursorLockMode.Locked;
-            Cursor.visible = false;
         }
         healthBar.value = health;
     }
@@ -197,6 +195,8 @@ public class PlayerController : MonoBehaviour
     {
         healthBar.maxValue = health;
         healthBar.value = health;
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
     }
 
     // Update is called once per frame
