@@ -40,6 +40,10 @@ public class PlayerController : MonoBehaviour
     public ParticleSystem fullChargeEffect;
     private bool fullChargeShown = false;
     public Slider healthBar;
+    public Image parryFlash;
+    private float parryFlashAlpha = 0f;
+    public float blockProtectionDelay = 0.5f;
+    private float blockTimeHeld = 0f;
 
     private enum PlayerState
     {
@@ -65,11 +69,18 @@ public class PlayerController : MonoBehaviour
             if (parryTimeRemaining > 0f)
             {
                 parryTimeRemaining = 0f;
+
+                parryFlashAlpha = 0.3f;
+                parryFlash.color = new Color(1f, 1f, 1f, parryFlashAlpha);
+
                 bossController.GetParried();
                 return;
             }
 
-            damage = 10;
+            if (blockTimeHeld >= blockProtectionDelay)
+            {
+                damage = 10;
+            }
         }
 
         health = health - damage;
@@ -80,7 +91,6 @@ public class PlayerController : MonoBehaviour
             SetState(PlayerState.Dead);
         }
         healthBar.value = health;
-        Debug.Log("Player health: " + health);
     }
 
     //all state changes go through this function, makes code clean.
@@ -91,7 +101,7 @@ public class PlayerController : MonoBehaviour
         {
             return;
         }
-        // Leaving Block starts a cooldown.
+        //this allows eaving block to start a cooldown.
         if (currentState == PlayerState.Block)
         {
             blockCooldownRemaining = blockCooldown;
@@ -109,6 +119,7 @@ public class PlayerController : MonoBehaviour
         }
         else if (currentState == PlayerState.Block)
         {
+            blockTimeHeld = 0f;
             parryTimeRemaining = parryDuration;
             animator.Play("Block");
         }
@@ -169,9 +180,24 @@ public class PlayerController : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        if (parryFlashAlpha > 0f)
+        {
+            parryFlashAlpha = parryFlashAlpha - Time.deltaTime * 3f;
+
+            if (parryFlashAlpha < 0f)
+            {
+                parryFlashAlpha = 0f;
+            }
+
+            parryFlash.color = new Color(1f, 1f, 1f, parryFlashAlpha);
+        }
         if (currentState == PlayerState.Dead)
         {
             return;
+        }
+        if (currentState == PlayerState.Block)
+        {
+            blockTimeHeld = blockTimeHeld + Time.deltaTime;
         }
         if (blockCooldownRemaining > 0f)
         {

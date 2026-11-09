@@ -26,6 +26,8 @@ public class BossController : MonoBehaviour
     public int health = 300;
     public GameManager gameManager;
     public Slider healthBar;
+    public Animator weaponAnimator;
+    public float sideSwingWindupDuration = 1f;
     public void TakeDamage(int damage)
     {
         if (currentState == BossState.Dead)
@@ -43,8 +45,6 @@ public class BossController : MonoBehaviour
         healthBar.value = health;
     }
 
-
-    public Renderer bossRenderer;
     private BossState currentState = BossState.Chase;
     private void SetState(BossState newState)
     {
@@ -58,19 +58,29 @@ public class BossController : MonoBehaviour
         if (currentState == BossState.Chase)
         {
             agent.isStopped = false;
-            bossRenderer.material.color = Color.white;
         }
         else if (currentState == BossState.Windup)
         {
             agent.isStopped = true;
-            stateTimeRemaining = windupDuration;
-            bossRenderer.material.color = Color.yellow;
+            weaponAnimator.speed = 1f;
+
+            int attackChoice = Random.Range(0, 2);
+
+            if (attackChoice == 0)
+            {
+                stateTimeRemaining = windupDuration;
+                weaponAnimator.Play("BossOverhead", 0, 0f);
+            }
+            else
+            {
+                stateTimeRemaining = sideSwingWindupDuration;
+                weaponAnimator.Play("BossSideSwing", 0, 0f);
+            }
         }
         else if (currentState == BossState.Attack)
         {
             agent.isStopped = true;
             stateTimeRemaining = attackDuration;
-            bossRenderer.material.color = Color.red;
 
             float distance = Vector3.Distance(transform.position, player.position);
 
@@ -83,19 +93,18 @@ public class BossController : MonoBehaviour
         {
             agent.isStopped = true;
             stateTimeRemaining = recoveryDuration;
-            bossRenderer.material.color = Color.blue;
         }
         else if (currentState == BossState.Stunned)
         {
             agent.isStopped = true;
             stateTimeRemaining = stunDuration;
-            bossRenderer.material.color = Color.magenta;
+            weaponAnimator.speed = 0f;
         }
         else if (currentState == BossState.Dead)
         {
             agent.isStopped = true;
-            bossRenderer.material.color = Color.gray;
             gameManager.EndGame(true);
+            weaponAnimator.speed = 0f;
         }
     }
     public void GetParried()
